@@ -274,7 +274,7 @@
 
     function visitNode(node, mappingContext, nodeContext) {
       var result = { ignore: true };
-      if (!node) { return result; }
+      if (!node || nodeContext.nodeType === 'anonProp') { return result; }
 
       var propertyName = nodeContext.propertyName;
       var ignore = node.__deferred != null || propertyName === "__metadata" ||
@@ -307,25 +307,45 @@
       }
 
       // query node
-
       var typeName = dataServiceAdapter._serverTypeNameToClient(mappingContext, metadata.type);
       entityType = dataServiceAdapter._getNodeEntityType(mappingContext, typeName);
 
-      if (entityType) {
-        // ASSUME if #-of-properties on node is >= #-of-props for the type
-        // that this is the full entity and not a partial projection.
-        // Therefore we declare that we've received an entity
-        if (entityType._mappedPropertiesCount <= Object.keys(node).length - 1) {
-          result.entityType = entityType;
-          result.extraMetadata = metadata;
-
-          // Delete node properties that look like nested navigation paths
-          // Breeze gets confused into thinking such properties contain actual entities.
-          // Todo: rethink this if/when can include related entities through expand
-          var navPropNames = entityType.navigationProperties.map(function (p) { return p.name; });
-          navPropNames.forEach(function (n) { if (node[n]) { delete node[n]; } });
+      // Validate node
+      var isValidEntity = true;
+      
+      //  Basic check to see if name exists since an unknown typeName will map to "" and then an object with _mappedPropertiesCount
+      //   but this isn't an object we're interested in so we make sure the name exists
+      if(!entityType || !entityType.name){
+        isValidEntity = false;
+      }
+      
+      if(isValidEntity){
+        //Verify all Key entries are present
+        for(var k=0; k<entityType.keyProperties.length; k++){
+          if(!node[entityType.keyProperties[k].name]){
+            isValidEntity = false;
+            break;
+          }
         }
       }
+      
+      if(isValidEntity){
+        //Verify all required data properties are present
+        for(var d=0; d<entityType.dataProperties.length; d++){
+          if(!entityType.dataProperties[d].isNullable && !node[entityType.dataProperties[d].name]){
+            isValidEntity = false;
+            break;
+          }
+        }
+      }
+      
+      if(isValidEntity){
+        result.entityType = entityType;
+        result.extraMetadata = metadata;
+      } else {
+        result.ignore = true;
+      }
+      
     }
   }
 
