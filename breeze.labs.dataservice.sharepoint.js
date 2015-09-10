@@ -386,8 +386,8 @@
   }
 
   function serverTypeNameToClientDefault(serverTypeName) {
-    // strip off leading 'SP.Data.' and trailing 'ListItem'
-    var re = /^(SP\.Data.)(.*)(ListItem)$/;
+    // strip off leading 'SP.Data.' and trailing 'ListItem' or 'Item'
+    var re = /^(SP\.Data.)(.*?)(Item|ListItem)$/;
     var typeName = serverTypeName.replace(re, '$2');
 
     return breeze.MetadataStore.normalizeTypeName(typeName);
