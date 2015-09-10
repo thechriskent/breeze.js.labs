@@ -186,7 +186,7 @@ entityManager.executeQuery(
 Advanced Examples
 ------------------
 
-##Expand related entities
+###Expand Related Entities
 Many times you will have related items that you will want to query at the same time. For instance, you may have a list serving as a lookup and you would like to fill those entities at the same time as you query the list containing the lookup column (Eager Loading). You can do this by establishing those relationships through [navigationProperties](http://breeze.github.io/doc-js/navigation-properties.html):
 ````javascript
 //Establish your relationships during the setup of your Metadata Store
@@ -227,6 +227,66 @@ entityManager.executeQuery(
   breeze.EntityQuery.from(courseType.defaultResourceName)
     .select(courseType.custom.defaultSelect + ',Department.Id,Department.Title')
     .expand('Department')
+).then(function(d){
+  //do something with d.results
+}).fail(function(e){
+  //handle e
+});
+````
+
+
+###Include Person Results
+SharePoint person fields include a reference to the hidden UserInfo list which is not queryable the same way as other lists. In order to pull back details (name, email, etc.) about a person column you'll need to setup a UserInfo entity. This entity should not be queried directly but only used in expansions of person fields.
+````javascript
+// UserInfo Dummy type
+//  Don't query directly, exits for expanded nav properties
+addType({
+  name: 'UserInfo',
+  defaultResourceName: 'dummy',
+  dataProperties:{
+    Id: { type: breeze.DataType.Int32 },
+    FirstName: { nullable: true},
+    LastName: { nullable: true },
+    Picture: { nullable: true },
+    Name: { nullable: true },
+    Department: { nullable: true },
+    EMail: { nullable: true }
+  },
+  navigationProperties: {
+    Registrations: {
+      type: 'Registrations',
+      hasMany: true
+    }
+  }
+});
+
+addType({
+  name: 'Registrations',
+  defaultResourceName: "getbytitle('Registrations')/items",
+  dataProperties:{
+    Id: { type: breeze.DataType.Int32 },
+    Title: { nullable: true },
+    AttendeeId: { type: breeze.DataType.Int32 },
+    CourseId: { type: breeze.DataType.Int32 },
+    Created: { type: breeze.DataType.DateTime, nullable: true }
+  },
+    navigationProperties:{
+      Course: 'Courses',
+      Attendee: 'UserInfo'
+  }
+});
+var registrationsType = metadataStore.getEntityType('Registrations');
+
+// If you also wanted to access registrations directly from courses you would want to add a Registrations entry to the courses entity's navigationProperties
+//   Registrations: { type: 'Registrations', hasMany: true }
+````
+
+Above we have expanded our Metadata Store with a UserInfo entity and a Registrations entity that links to both courses and UserInfo. We could query registrations and include all related courses and attendees using the following:
+````javascript
+entityManager.executeQuery(
+  breeze.EntityQuery.from(registrationsType.defaultResourceName)
+    .select(registrationsType.custom.defaultSelect + ',Course.Id,Course.Title,Attendee.Id,Attendee.EMail,Attendee.Name')
+    .expand('Course,Attendee')
 ).then(function(d){
   //do something with d.results
 }).fail(function(e){
