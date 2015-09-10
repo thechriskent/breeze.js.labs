@@ -23,6 +23,7 @@ Setup
 1. Configure BreezeJS SharePoint data service adapter
 1. Create & populate the BreezeJS metadata store
 1. Initialize BreezeJS
+1. Perform a Query
 
 
 
@@ -142,7 +143,7 @@ addType(contactEntity);
 ###Step 4 - Initialize BreezeJS
 ````javascript
 // get reference to contact entity type
-contactType = metadataStore.getEntityType('Contacts');
+var contactType = metadataStore.getEntityType('Contacts');
 
 // create the data service
 var dataService = new breeze.DataService({
@@ -163,6 +164,73 @@ var entityManager = new breeze.EntityManager({
   dataService: dataService,
   // tell breeze where the metadata is
   metadataStore: metadataStore
+});
+````
+
+
+
+###Step 5 - Perform a Query
+For details and examples of querying and handling success/failures, please see the [breeze documentation](http://breeze.github.io/doc-js/query.html). Here is a simple example utilizing the entity created above:
+````javascript
+entityManager.executeQuery(
+  breeze.EntityQuery.from(contactType.defaultResourceName)
+).then(function(d){
+  //do something with d.results
+}).fail(function(e){
+  //handle e
+});
+````
+
+
+
+Advanced Examples
+------------------
+
+##Expand related entities
+Many times you will have related items that you will want to query at the same time. For instance, you may have a list serving as a lookup and you would like to fill those entities at the same time as you query the list containing the lookup column (Eager Loading). You can do this by establishing those relationships through [navigationProperties](http://breeze.github.io/doc-js/navigation-properties.html):
+````javascript
+//Establish your relationships during the setup of your Metadata Store
+addType({
+  name: 'Courses',
+  defaultResourceName: "getbytitle('Courses')/items",
+  dataProperties: {
+    Id: { type: breeze.DataType.Int32 },
+    Title: { nullable: false },
+    DepartmentId: { type: breeze.DataType.Int32 }
+  },
+  navigationProperties: {
+    Department: 'Departments'
+  }
+});
+var courseType = metadataStore.getEntityType('Courses');
+
+addType({
+  name: 'Departments',
+  defaultResourceName: "getbytitle('Departments')/items",
+  dataProperties: {
+    Id: { type: breeze.DataType.Int32 },
+    Title: { nullable: false }
+  },
+  navigationProperties: {
+    Courses: {
+      type: 'Courses',
+      hasMany: true
+    }
+  }
+});
+var departmentType = metadataStore.getEntityType('Departments');
+````
+
+Above, we have a basic Departments list. We also have a Courses list with a lookup column using the Departments list. Later, if you'd like to Eager Load departments when you query Courses you can use Expand:
+````javascript
+entityManager.executeQuery(
+  breeze.EntityQuery.from(courseType.defaultResourceName)
+    .select(courseType.custom.defaultSelect + ',Department.Id,Department.Title')
+    .expand('Department')
+).then(function(d){
+  //do something with d.results
+}).fail(function(e){
+  //handle e
 });
 ````
 
